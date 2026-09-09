@@ -1,0 +1,9 @@
+[project]
+name = "infosec-restapi"
+version = "0.1.0"
+description = "Educational REST API with iterative security hardening."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

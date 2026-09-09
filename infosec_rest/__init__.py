@@ -1,0 +1,2 @@
+"""Educational REST API package."""
+
