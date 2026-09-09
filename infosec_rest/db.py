@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import sqlite3
 from pathlib import Path
 
@@ -18,7 +19,7 @@ def connect(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     return connection
 
 
-def initialize(connection: sqlite3.Connection) -> None:
+def initialize(connection: sqlite3.Connection, admin_password: str | None = None) -> None:
     _migrate_users_table(connection)
     connection.executescript(
         """
@@ -38,9 +39,11 @@ def initialize(connection: sqlite3.Connection) -> None:
         );
         """
     )
+    if admin_password is None:
+        admin_password = secrets.token_urlsafe(24)
     connection.execute(
         "INSERT OR IGNORE INTO users (username, password_hash) VALUES (?, ?)",
-        ("admin", hash_password("admin123")),
+        ("admin", hash_password(admin_password)),
     )
     connection.execute(
         """

@@ -9,7 +9,7 @@ from infosec_rest.db import connect, initialize
 @pytest.fixture()
 def api() -> Api:
     connection = connect(":memory:")
-    initialize(connection)
+    initialize(connection, admin_password="admin123")
     try:
         yield Api(connection)
     finally:
@@ -62,7 +62,7 @@ def test_legacy_plain_password_is_migrated() -> None:
     )
 
     try:
-        initialize(connection)
+        initialize(connection, admin_password="admin123")
         api = Api(connection)
         row = connection.execute("SELECT password_hash FROM users WHERE username = ?", ("legacy",)).fetchone()
 

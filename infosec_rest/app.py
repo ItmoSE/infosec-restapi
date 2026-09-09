@@ -11,6 +11,10 @@ from typing import Any
 from infosec_rest.auth import AuthenticatedUser, JwtService, verify_password
 
 
+# This is an HTTP auth scheme, not a secret.
+BEARER_TOKEN_TYPE = "Bearer"  # nosec B105
+
+
 class Api:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self.connection = connection
@@ -52,7 +56,7 @@ class Api:
                         HTTPStatus.OK,
                         {
                             "access_token": token,
-                            "token_type": "Bearer",
+                            "token_type": BEARER_TOKEN_TYPE,
                         },
                     )
                     return
@@ -99,7 +103,7 @@ class Api:
             def _require_session(self) -> AuthenticatedUser | None:
                 authorization = self.headers.get("Authorization", "")
                 token_type, _, token = authorization.partition(" ")
-                if token_type != "Bearer" or not token:
+                if token_type != BEARER_TOKEN_TYPE or not token:
                     self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "Missing bearer token"})
                     return None
                 user = api.jwt.verify(token)
