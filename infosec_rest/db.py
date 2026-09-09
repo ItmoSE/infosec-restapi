@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from infosec_rest.auth import hash_password
+
 
 DEFAULT_DB_PATH = Path("data/app.db")
 
@@ -17,12 +19,13 @@ def connect(db_path: str | Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
 
 
 def initialize(connection: sqlite3.Connection) -> None:
+    _migrate_users_table(connection)
     connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
+            password_hash TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS posts (
@@ -36,8 +39,8 @@ def initialize(connection: sqlite3.Connection) -> None:
         """
     )
     connection.execute(
-        "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)",
-        ("admin", "admin123"),
+        "INSERT OR IGNORE INTO users (username, password_hash) VALUES (?, ?)",
+        ("admin", hash_password("admin123")),
     )
     connection.execute(
         """
@@ -46,4 +49,31 @@ def initialize(connection: sqlite3.Connection) -> None:
         """,
         (1, "Welcome", "First demo post", 1),
     )
+    connection.commit()
+
+
+def _migrate_users_table(connection: sqlite3.Connection) -> None:
+    table = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = ? AND name = ?",
+        ("table", "users"),
+    ).fetchone()
+    if table is None:
+        return
+
+    columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(users)").fetchall()
+    }
+    if "password_hash" in columns:
+        return
+    if "password" not in columns:
+        raise RuntimeError("Unsupported users table schema")
+
+    connection.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    users = connection.execute("SELECT id, password FROM users").fetchall()
+    for user in users:
+        connection.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(user["password"]), user["id"]),
+        )
     connection.commit()

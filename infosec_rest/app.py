@@ -3,17 +3,18 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from html import escape
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from typing import Any
 
-from infosec_rest.auth import Session, SessionStore
+from infosec_rest.auth import AuthenticatedUser, JwtService, verify_password
 
 
 class Api:
     def __init__(self, connection: sqlite3.Connection) -> None:
         self.connection = connection
-        self.sessions = SessionStore()
+        self.jwt = JwtService()
         self._db_lock = threading.RLock()
 
     def handler(self) -> type[BaseHTTPRequestHandler]:
@@ -38,19 +39,20 @@ class Api:
             def do_POST(self) -> None:
                 if self.path == "/auth/login":
                     payload = self._read_json()
+                    if payload is None:
+                        return
                     username = str(payload.get("username", ""))
                     password = str(payload.get("password", ""))
                     user = api.find_user(username, password)
                     if user is None:
                         self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "Invalid credentials"})
                         return
-                    session = api.sessions.create(user_id=user["id"], username=user["username"])
+                    token = api.jwt.issue(user_id=user["id"], username=user["username"])
                     self._send_json(
                         HTTPStatus.OK,
                         {
-                            "access_token": session.token,
+                            "access_token": token,
                             "token_type": "Bearer",
-                            "expires_at": session.expires_at.isoformat(),
                         },
                     )
                     return
@@ -60,6 +62,8 @@ class Api:
                     if session is None:
                         return
                     payload = self._read_json()
+                    if payload is None:
+                        return
                     title = str(payload.get("title", "")).strip()
                     body = str(payload.get("body", "")).strip()
                     if not title or not body:
@@ -77,7 +81,7 @@ class Api:
             def log_message(self, format: str, *args: Any) -> None:
                 return
 
-            def _read_json(self) -> dict[str, Any]:
+            def _read_json(self) -> dict[str, Any] | None:
                 content_length = int(self.headers.get("Content-Length", "0"))
                 if content_length == 0:
                     return {}
@@ -86,25 +90,26 @@ class Api:
                     payload = json.loads(raw_body.decode("utf-8"))
                 except json.JSONDecodeError:
                     self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid JSON"})
-                    return {}
+                    return None
                 if isinstance(payload, dict):
                     return payload
-                return {}
+                self._send_json(HTTPStatus.BAD_REQUEST, {"error": "JSON object is required"})
+                return None
 
-            def _require_session(self) -> Session | None:
+            def _require_session(self) -> AuthenticatedUser | None:
                 authorization = self.headers.get("Authorization", "")
                 token_type, _, token = authorization.partition(" ")
                 if token_type != "Bearer" or not token:
                     self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "Missing bearer token"})
                     return None
-                session = api.sessions.get(token)
-                if session is None:
+                user = api.jwt.verify(token)
+                if user is None:
                     self._send_json(HTTPStatus.UNAUTHORIZED, {"error": "Invalid bearer token"})
                     return None
-                return session
+                return user
 
             def _send_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
-                body = json.dumps(payload).encode("utf-8")
+                body = json.dumps(sanitize_payload(payload)).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -116,10 +121,13 @@ class Api:
     def find_user(self, username: str, password: str) -> sqlite3.Row | None:
         with self._db_lock:
             cursor = self.connection.execute(
-                "SELECT id, username FROM users WHERE username = ? AND password = ?",
-                (username, password),
+                "SELECT id, username, password_hash FROM users WHERE username = ?",
+                (username,),
             )
-            return cursor.fetchone()
+            user = cursor.fetchone()
+            if user is None or not verify_password(password, user["password_hash"]):
+                return None
+            return user
 
     def list_posts(self) -> list[dict[str, Any]]:
         with self._db_lock:
@@ -151,3 +159,13 @@ class Api:
                 (post_id,),
             ).fetchone()
             return dict(row)
+
+
+def sanitize_payload(value: Any) -> Any:
+    if isinstance(value, str):
+        return escape(value, quote=True)
+    if isinstance(value, list):
+        return [sanitize_payload(item) for item in value]
+    if isinstance(value, dict):
+        return {key: sanitize_payload(item) for key, item in value.items()}
+    return value
