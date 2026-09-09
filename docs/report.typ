@@ -92,6 +92,15 @@ Workflow состоит из трёх независимых job:
 получение токена через `POST /auth/login`, обращение к `GET /api/data` с
 токеном и проверка отказа без заголовка `Authorization`.
 
+Локально выполнены проверки:
+- `.venv/bin/python -m pytest` - 9 тестов пройдены успешно.
+- `.venv/bin/bandit -r infosec_rest -c bandit.yaml` - проблем не найдено.
+- `GET /health` - получен `200 OK`.
+- `GET /api/data` без токена - получен `401 Unauthorized`.
+- `POST /auth/login` с тестовой учётной записью - получен JWT.
+- `GET /api/data` с `Authorization: Bearer <token>` - получен `200 OK` и
+  список публикаций.
+
 #figure(
   rect(width: 100%, height: 40mm, stroke: 1pt + gray, inset: 8pt)[
     *Вставить скриншот: ручной тест `POST /auth/login`.*
