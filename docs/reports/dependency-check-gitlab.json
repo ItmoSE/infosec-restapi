@@ -1,0 +1,43 @@
+{
+    "version": "15.0.6",
+    "schema": "https://gitlab.com/gitlab-org/security-products/security-report-schemas/-/raw/v15.0.6/dist/dependency-scanning-report-format.json?ref_type=tags",     "scan": {
+                "scanner": {
+            "id": "org.owasp.dependency-check",
+            "name": "Dependency-Check Core",
+            "version": "13.0.0",
+            "vendor": {
+                "name": "OWASP"
+            },
+
+                        "url": "https://github.com/dependency-check/DependencyCheck/"
+        },
+                        "analyzer": {
+            "id": "org.owasp.dependency-check",
+            "name": "Dependency-Check Core",
+            "version": "13.0.0",
+            "vendor": {
+                "name": "OWASP"
+            },
+
+                        "url": "https://github.com/dependency-check/DependencyCheck/"
+        },
+
+        "end_time": "2026-09-19T15:26:42",
+                "start_time": "2026-09-19T15:26:42",
+                "status":  "success"  ,
+                "type": "dependency_scanning"
+
+                                    },
+    "vulnerabilities": [
+    ],
+    "dependency_files": [
+                {
+            "path": "pom.xml",
+            "package_manager": "maven",
+            "dependencies": [
+            ]
+                    }
+    ],
+
+        "remediations": [] 
+}
