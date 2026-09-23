@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -14,14 +15,17 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
@@ -32,34 +36,43 @@ jobs:
   sast:
     name: SAST Bandit
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install Bandit
         run: python -m pip install -r requirements-dev.txt
 
       - name: Run Bandit
-        run: bandit -r infosec_rest -c bandit.yaml -f json -o bandit-report.json
+        run: |
+          bandit -r infosec_rest \
+            -c bandit.yaml \
+            -f json \
+            -o bandit-report.json
 
       - name: Upload Bandit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-report
           path: bandit-report.json
+          if-no-files-found: warn
 
   sca:
     name: SCA OWASP Dependency-Check
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@main
@@ -74,7 +87,8 @@ jobs:
 
       - name: Upload Dependency-Check report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-check-report
-          path: dependency-check-report
+          path: dependency-check-report/
+          if-no-files-found: warn
