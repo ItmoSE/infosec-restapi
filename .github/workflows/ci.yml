@@ -66,29 +66,54 @@ jobs:
           path: bandit-report.json
           if-no-files-found: warn
 
-  sca:
-    name: SCA OWASP Dependency-Check
-    runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
+sca:
+  name: SCA OWASP Dependency-Check
+  runs-on: ubuntu-latest
 
-      - name: Run OWASP Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: infosec-restapi
-          path: .
-          format: ALL
-          out: dependency-check-report
-          args: >
-            --failOnCVSS 7
-            --enableRetired
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
 
-      - name: Upload Dependency-Check report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: dependency-check-report
-          path: dependency-check-report/
-          if-no-files-found: warn
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.12"
+
+    - name: Prepare dependency list
+      run: |
+        python -m venv .sca-venv
+        .sca-venv/bin/python -m pip install -r requirements-dev.txt
+
+        mkdir -p sca-input
+        .sca-venv/bin/python -m pip freeze > sca-input/requirements.txt
+
+        test -s sca-input/requirements.txt
+        cat sca-input/requirements.txt
+
+    - name: Run OWASP Dependency-Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: infosec-restapi
+        path: sca-input
+        format: ALL
+        out: dependency-check-report
+        args: >
+          --enableExperimental
+          --failOnCVSS 7
+          --enableRetired
+
+    - name: Verify dependency scan
+      if: always()
+      run: |
+        jq -e '
+          (.dependencies // []) | length > 0
+        ' dependency-check-report/dependency-check-report.json
+
+    - name: Upload Dependency-Check report
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: dependency-check-report
+        path: dependency-check-report/
+        if-no-files-found: warn
